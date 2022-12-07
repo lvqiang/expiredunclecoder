@@ -5,9 +5,6 @@ tags:
 categories:
 - devops
 ---
-
-# kubernetes部署高可用
-
 本文将从零开始，在干净的机器上安装 Docker、Kubernetes (使用 kubeadm)、Calico，搭建一个高可用生产级的 Kubernetes。
 
 ## 环境准备
