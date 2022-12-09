@@ -100,12 +100,6 @@ $ swapoff -a
 $ sed -ri 's/.*swap.*/#&/' /etc/fstab
 ```
 
-#### 安装ipvs(放到k8s)
-
-```bash
-$ yum -y install ipvsadm ipset
-```
-
 ## docker安装
 
 ### 配置宿主机网卡转发
@@ -268,12 +262,37 @@ kubeadm init \
     # 将 Control-plane 证书上传到 kubeadm-certs Secret
 ```
 
-执行下面的命令
+#### 高可用
+
+使用 kube-vip 来实现集群的高可用，首先在 master1 节点上生成基本的 Kubernetes 静态 Pod 资源清单文件。
+
+文档：https://kube-vip.io/docs/installation/static/
+
+```bash
+# 设置VIP地址
+$ export VIP=172.23.131.100
+$ export INTERFACE=eth0
+$ docker pull plndr/kube-vip:v0.5.7
+
+$ mkdir -pv /etc/kubernetes/manifests/
+$ alias kube-vip="docker run --network host --rm docker.io/plndr/kube-vip:v0.5.7"
+$ kube-vip manifest pod \
+    --interface $INTERFACE \
+    --address $VIP \
+    --controlplane \
+    --services \
+    --arp \
+    --leaderElection | tee /etc/kubernetes/manifests/kube-vip.yaml
+    
+# 自动生成 /etc/kubernetes/manifests/kube-vip.yaml文件，kubeadm在初始化时会生成kube-vip的静态pod。
+```
+
+#### 集群初始化
 
 ```bash
 $ kubeadm init \
  --apiserver-advertise-address 172.23.131.28 \
- --control-plane-endpoint kuber4s.api \
+ --control-plane-endpoint 172.23.131.100:6443 \
  --image-repository registry.cn-hangzhou.aliyuncs.com/google_containers \
  --kubernetes-version 1.23.9 \
  --pod-network-cidr=10.244.0.0/16 \
@@ -302,9 +321,9 @@ Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 
 You can now join any number of the control-plane node running the following command on each as root:
 
-  kubeadm join kuber4s.api:6443 --token 5pyutk.csqw7jssglmwj7i5 \
-	--discovery-token-ca-cert-hash sha256:a567d19e2936226ed8d4b5ba1e993a9a07c9d3c27d19b2ea69c2f7383f7edc0f \
-	--control-plane --certificate-key 01eac50331ec19fe222d25e95e7f022ad08003848caed0becebf18a76a4f8ed0
+   kubeadm join 172.23.131.100:6443 --token 9vi77p.nkla7mjdekzwngbx \
+	--discovery-token-ca-cert-hash sha256:c13e578e5d18f098c74b0777bbd43f46566dea9a72950a77534ff757653bd05e \
+	--control-plane --certificate-key 8d95f8ef5c7e95602c796f1f5c18cfea44ca45d356ad7d988544f34d52509bb4
 
 Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
 As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
@@ -312,8 +331,8 @@ As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you c
 
 Then you can join any number of worker nodes by running the following on each as root:
 
-kubeadm join kuber4s.api:6443 --token 5pyutk.csqw7jssglmwj7i5 \
---discovery-token-ca-cert-hash sha256:a567d19e2936226ed8d4b5ba1e993a9a07c9d3c27d19b2ea69c2f7383f7edc0f 
+kubeadm join 172.23.131.100:6443 --token 9vi77p.nkla7mjdekzwngbx \
+	--discovery-token-ca-cert-hash sha256:c13e578e5d18f098c74b0777bbd43f46566dea9a72950a77534ff757653bd05e 
 ```
 
 根据上面的提示执行命令
@@ -348,18 +367,35 @@ $ kubectl get pods --all-namespaces
 $ ipvsadm -L -n
 ```
 
-### master2节点
+### master2、3节点
 
-先要修改/etc/hosts
+#### 高可用
 
 ```bash
-172.23.131.28 kuber4s.api #为了简单，没有使用nginx
+# 设置VIP地址
+$ export VIP=172.23.131.100
+$ export INTERFACE=eth0
+$ docker pull plndr/kube-vip:v0.5.7
+
+$ mkdir -pv /etc/kubernetes/manifests/
+$ alias kube-vip="docker run --network host --rm docker.io/plndr/kube-vip:v0.5.7"
+$ kube-vip manifest pod \
+    --interface $INTERFACE \
+    --address $VIP \
+    --controlplane \
+    --services \
+    --arp \
+    --leaderElection | tee /etc/kubernetes/manifests/kube-vip.yaml
+    
+# 自动生成 /etc/kubernetes/manifests/kube-vip.yaml文件，kubeadm在初始化时会生成kube-vip的静态pod。
 ```
 
+#### 加入master1
+
 ```bash
-  $ kubeadm join kuber4s.api:6443 --token 5pyutk.csqw7jssglmwj7i5 \
-    --discovery-token-ca-cert-hash sha256:a567d19e2936226ed8d4b5ba1e993a9a07c9d3c27d19b2ea69c2f7383f7edc0f \
-    --control-plane --certificate-key 01eac50331ec19fe222d25e95e7f022ad08003848caed0becebf18a76a4f8ed0
+  $ kubeadm join 172.23.131.100:6443 --token nqxel9.ymptu99i8b585gnq \
+  --discovery-token-ca-cert-hash sha256:1756048aecb4bd7c9d43e9afe604b662e2b2a0dd067e05eb616670a73cfb1d5c \
+  --control-plane --certificate-key fd6dc5187fe46ab99d8af144927d6952af4ec6926b93bb3e45339aec9a050241
 ```
 
 成功后可以看到以下内容
@@ -393,11 +429,15 @@ Calico最重要的是要选对版本号：https://projectcalico.docs.tigera.io/g
 安装参考：https://projectcalico.docs.tigera.io/archive/v3.23/getting-started/kubernetes/quickstart
 
 ```bash
-#
 $ kubectl create -f https://projectcalico.docs.tigera.io/archive/v3.23/manifests/tigera-operator.yaml
 
-wget https://projectcalico.docs.tigera.io/archive/v3.23/manifests/custom-resources.yaml
-$ kubectl create -f https://projectcalico.docs.tigera.io/archive/v3.23/manifests/custom-resources.yaml
+# 修改pod地址
+$ wget https://projectcalico.docs.tigera.io/archive/v3.23/manifests/custom-resources.yaml
+$ vim custom-resources.yaml
+cidr: 10.244.0.0/16
+
+#安装
+$ kubectl apply -f custom-resources.yaml
 
 #查看安装进度
 $ watch kubectl get pods -n calico-system
@@ -433,15 +473,9 @@ tigera-operator    tigera-operator-7885599d97-vdf6z             1/1     Running 
 
 ### node1节点
 
-先要修改/etc/hosts
-
 ```bash
-172.23.131.28 kuber4s.api #为了简单，没有使用nginx
-```
-
-```bash
-$ kubeadm join kuber4s.api:6443 --token 5pyutk.csqw7jssglmwj7i5 \
---discovery-token-ca-cert-hash sha256:a567d19e2936226ed8d4b5ba1e993a9a07c9d3c27d19b2ea69c2f7383f7edc0f 
+$ kubeadm join 172.23.131.100:6443 --token 9vi77p.nkla7mjdekzwngbx \
+--discovery-token-ca-cert-hash sha256:c13e578e5d18f098c74b0777bbd43f46566dea9a72950a77534ff757653bd05e 
 
 #验证是否成功
 $ kubectl get nodes
@@ -449,15 +483,9 @@ $ kubectl get nodes
 
 ### node2节点
 
-先要修改/etc/hosts
-
 ```bash
-172.23.131.28 kuber4s.api #为了简单，没有使用nginx
-```
-
-```bash
-$ kubeadm join kuber4s.api:6443 --token 5pyutk.csqw7jssglmwj7i5 \
---discovery-token-ca-cert-hash sha256:a567d19e2936226ed8d4b5ba1e993a9a07c9d3c27d19b2ea69c2f7383f7edc0f 
+$ kubeadm join 172.23.131.100:6443 --token 9vi77p.nkla7mjdekzwngbx \
+--discovery-token-ca-cert-hash sha256:c13e578e5d18f098c74b0777bbd43f46566dea9a72950a77534ff757653bd05e 
 
 #验证是否成功
 $ kubectl get nodes
@@ -479,6 +507,9 @@ $ kubeadm reset -f
 ```bash
 #docker所有容器删除
 $ docker rm $(docker ps -a -q)
+
+#重置ipvs
+$ ipvsadm --clear
 
 #删除原有集群文件
 $ rm -rf /etc/cni /opt/cni  /etc/kubernetes /var/lib/dockershim /var/lib/etcd /var/lib/kubelet /var/lib/cni /var/run/kubernetes /var/run/calico ~/.kube/*
