@@ -144,7 +144,6 @@ metadata:
   name: nfs-default-storage
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
-    storageclass.kubesphere.io/support-snapshot: "false"
 provisioner: nfs/kubesphere
 parameters:
   archiveOnDelete: "true"  ## 删除pv的时候，pv的内容是否要备份
@@ -159,8 +158,6 @@ metadata:
   name: nfs-client-provisioner
   labels:
     app: nfs-client-provisioner
-  # replace with namespace where provisioner is deployed
-  namespace: kubesphere-system
 spec:
   replicas: 1
   strategy:
@@ -173,15 +170,10 @@ spec:
       labels:
         app: nfs-client-provisioner
     spec:
-      serviceAccountName: nfs-client-provisioner
+      serviceAccount: nfs-provisioner
       containers:
         - name: nfs-client-provisioner
           image: 172.23.131.24:8222/kubesphere/nfs-subdir-external-provisioner:v4.0.2
-          # resources:
-          #    limits:
-          #      cpu: 10m
-          #    requests:
-          #      cpu: 10m
           volumeMounts:
             - name: nfs-client-root
               mountPath: /persistentvolumes
@@ -201,74 +193,68 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nfs-client-provisioner
-  # replace with namespace where provisioner is deployed
-  namespace: kubesphere-system
+  name: nfs-provisioner
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: nfs-client-provisioner-runner
+   name: nfs-provisioner-runner
 rules:
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "create", "delete"]
-  - apiGroups: [""]
-    resources: ["persistentvolumeclaims"]
-    verbs: ["get", "list", "watch", "update"]
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["create", "update", "patch"]
+   -  apiGroups: [""]
+      resources: ["persistentvolumes"]
+      verbs: ["get", "list", "watch", "create", "delete"]
+   -  apiGroups: [""]
+      resources: ["persistentvolumeclaims"]
+      verbs: ["get", "list", "watch", "update"]
+   -  apiGroups: ["storage.k8s.io"]
+      resources: ["storageclasses"]
+      verbs: ["get", "list", "watch"]
+   -  apiGroups: [""]
+      resources: ["events"]
+      verbs: ["watch", "create", "update", "patch"]
+   -  apiGroups: [""]
+      resources: ["services", "endpoints"]
+      verbs: ["get","create","list", "watch","update"]
+   -  apiGroups: ["extensions"]
+      resources: ["podsecuritypolicies"]
+      resourceNames: ["nfs-provisioner"]
+      verbs: ["use"]
+   -  apiGroups: [""]
+      resources: ["endpoints"]
+      verbs: ["get", "list", "watch", "create", "update", "patch"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: run-nfs-client-provisioner
+  name: run-nfs-provisioner
 subjects:
   - kind: ServiceAccount
-    name: nfs-client-provisioner
-    # replace with namespace where provisioner is deployed
-    namespace: kubesphere-system
+    name: nfs-provisioner
+    namespace: default
 roleRef:
   kind: ClusterRole
-  name: nfs-client-provisioner-runner
-  apiGroup: rbac.authorization.k8s.io
----
-kind: Role
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: leader-locking-nfs-client-provisioner
-  # replace with namespace where provisioner is deployed
-  namespace: kubesphere-system
-rules:
-  - apiGroups: [""]
-    resources: ["endpoints"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
----
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: leader-locking-nfs-client-provisioner
-  # replace with namespace where provisioner is deployed
-  namespace: kubesphere-system
-subjects:
-  - kind: ServiceAccount
-    name: nfs-client-provisioner
-    # replace with namespace where provisioner is deployed
-    namespace: kubesphere-system
-roleRef:
-  kind: Role
-  name: leader-locking-nfs-client-provisioner
+  name: nfs-provisioner-runner
   apiGroup: rbac.authorization.k8s.io
 ```
 
+"reclaim policy"有三种方式：Retain、Recycle、Deleted。
 
+- Retain
+
+- - 保护被PVC释放的PV及其上数据，并将PV状态改成"released"，不将被其它PVC绑定。集群管理员手动通过如下步骤释放存储资源
+
+- - - 手动删除PV，但与其相关的后端存储资源如(AWS EBS, GCE PD, Azure Disk, or Cinder volume)仍然存在。
+    - 手动清空后端存储volume上的数据。
+    - 手动删除后端存储volume，或者重复使用后端volume，为其创建新的PV。
+
+- Delete
+
+- - 删除被PVC释放的PV及其后端存储volume。对于动态PV其"reclaim policy"继承自其"storage class"，
+  - 默认是Delete。集群管理员负责将"storage class"的"reclaim policy"设置成用户期望的形式，否则需要用户手动为创建后的动态PV编辑"reclaim policy"
+
+- Recycle
+
+- - 保留PV，但清空其上数据，已废弃
 
 ## 部署
 
@@ -277,6 +263,192 @@ roleRef:
 ```bash
 curl -L -O https://github.com/kubesphere/ks-installer/releases/download/v3.3.1/cluster-configuration.yaml
 curl -L -O https://github.com/kubesphere/ks-installer/releases/download/v3.3.1/kubesphere-installer.yaml
+```
+
+```bash
+---
+apiVersion: installer.kubesphere.io/v1alpha1
+kind: ClusterConfiguration
+metadata:
+  name: ks-installer
+  namespace: kubesphere-system
+  labels:
+    version: v3.3.1
+spec:
+  persistence:
+    storageClass: ""        
+  authentication:
+    # adminPassword: "" 
+    jwtSecret: ""          
+  local_registry: ""        # Add your private registry address if it is needed.
+  # dev_tag: ""             
+  etcd:
+    monitoring: false       
+    endpointIps: localhost  
+    port: 2379             
+    tlsEnable: true
+  common:
+    core:
+      console:
+        enableMultiLogin: true  
+        port: 30880
+        type: NodePort
+    # apiserver:         
+    #  resources: {}
+    # controllerManager:
+    #  resources: {}
+    redis:
+      enabled: true
+      enableHA: false
+      volumeSize: 2Gi # Redis PVC size.
+    openldap:
+      enabled: false
+      volumeSize: 2Gi   # openldap PVC size.
+    minio:
+      volumeSize: 20Gi # Minio PVC size.
+    monitoring:
+      # type: external   # Whether to specify the external prometheus stack, and need to modify the endpoint at the next line.
+      endpoint: http://prometheus-operated.kubesphere-monitoring-system.svc:9090 # Prometheus endpoint to get metrics data.
+      GPUMonitoring:    
+        enabled: false
+    gpu:            
+      kinds:
+      - resourceName: "nvidia.com/gpu"
+        resourceType: "GPU"
+        default: true
+    es:   # Storage backend for logging, events and auditing.
+      # master:
+      #   volumeSize: 4Gi  # The volume size of Elasticsearch master nodes.
+      #   replicas: 1      # The total number of master nodes. Even numbers are not allowed.
+      #   resources: {}
+      # data:
+      #   volumeSize: 20Gi  # The volume size of Elasticsearch data nodes.
+      #   replicas: 1       # The total number of data nodes.
+      #   resources: {}
+      logMaxAge: 7             # Log retention time in built-in Elasticsearch. It is 7 days by default.
+      elkPrefix: logstash      # The string making up index names. The index name will be formatted as ks-<elk_prefix>-log.
+      basicAuth:
+        enabled: false
+        username: ""
+        password: ""
+      externalElasticsearchHost: ""
+      externalElasticsearchPort: ""
+  alerting:               
+    enabled: true        
+    # thanosruler:
+    #   replicas: 1
+    #   resources: {}
+  auditing:                # Provide a security-relevant chronological set of records，recording the sequence of activities happening on the platform, initiated by different tenants.
+    enabled: false         # Enable or disable the KubeSphere Auditing Log System.
+    # operator:
+    #   resources: {}
+    # webhook:
+    #   resources: {}
+  devops:   
+    enabled: false             # Enable or disable the KubeSphere DevOps System.
+    # resources: {}
+    jenkinsMemoryLim: 8Gi      # Jenkins memory limit.
+    jenkinsMemoryReq: 4Gi   # Jenkins memory request.
+    jenkinsVolumeSize: 8Gi     # Jenkins volume size.
+  events:                 
+    enabled: false       
+    # operator:
+    #   resources: {}
+    # exporter:
+    #   resources: {}
+    # ruler:
+    #   enabled: true
+    #   replicas: 2
+    #   resources: {}
+  logging:               
+    enabled: false         # Enable or disable the KubeSphere Logging System.
+    logsidecar:
+      enabled: true
+      replicas: 2
+      # resources: {}
+  metrics_server:                   
+    enabled: true             
+  monitoring:
+    storageClass: "" 
+    node_exporter:
+      port: 9100
+      # resources: {}
+    # kube_rbac_proxy:
+    #   resources: {}
+    # kube_state_metrics:
+    #   resources: {}
+    # prometheus:
+    #   replicas: 1  # Prometheus replicas are responsible for monitoring different segments of data source and providing high availability.
+    #   volumeSize: 20Gi  # Prometheus PVC size.
+    #   resources: {}
+    #   operator:
+    #     resources: {}
+    # alertmanager:
+    #   replicas: 1          # AlertManager Replicas.
+    #   resources: {}
+    # notification_manager:
+    #   resources: {}
+    #   operator:
+    #     resources: {}
+    #   proxy:
+    #     resources: {}
+    gpu:                           # GPU monitoring-related plug-in installation.
+      nvidia_dcgm_exporter:        # Ensure that gpu resources on your hosts can be used normally, otherwise this plug-in will not work properly.
+        enabled: false             # Check whether the labels on the GPU hosts contain "nvidia.com/gpu.present=true" to ensure that the DCGM pod is scheduled to these nodes.
+        # resources: {}
+  multicluster:
+    clusterRole: none  # host | member | none  # You can install a solo cluster, or specify it as the Host or Member Cluster.
+  network:
+    networkpolicy: # Network policies allow network isolation within the same cluster, which means firewalls can be set up between certain instances (Pods).
+      # Make sure that the CNI network plugin used by the cluster supports NetworkPolicy. There are a number of CNI network plugins that support NetworkPolicy, including Calico, Cilium, Kube-router, Romana and Weave Net.
+      enabled: false # Enable or disable network policies.
+    ippool: # Use Pod IP Pools to manage the Pod network address space. Pods to be created can be assigned IP addresses from a Pod IP Pool.
+      type: none # Specify "calico" for this field if Calico is used as your CNI plugin. "none" means that Pod IP Pools are disabled.
+    topology: # Use Service Topology to view Service-to-Service communication based on Weave Scope.
+      type: none # Specify "weave-scope" for this field to enable Service Topology. "none" means that Service Topology is disabled.
+  openpitrix: # An App Store that is accessible to all platform tenants. You can use it to manage apps across their entire lifecycle.
+    store:
+      enabled: false # Enable or disable the KubeSphere App Store.
+  servicemesh:         # (0.3 Core, 300 MiB) Provide fine-grained traffic management, observability and tracing, and visualized traffic topology.
+    enabled: false     # Base component (pilot). Enable or disable KubeSphere Service Mesh (Istio-based).
+    istio:  # Customizing the istio installation configuration, refer to https://istio.io/latest/docs/setup/additional-setup/customize-installation/
+      components:
+        ingressGateways:
+        - name: istio-ingressgateway
+          enabled: false
+        cni:
+          enabled: false
+  edgeruntime:          # Add edge nodes to your cluster and deploy workloads on edge nodes.
+    enabled: false
+    kubeedge:        # kubeedge configurations
+      enabled: false
+      cloudCore:
+        cloudHub:
+          advertiseAddress: # At least a public IP address or an IP address which can be accessed by edge nodes must be provided.
+            - ""            # Note that once KubeEdge is enabled, CloudCore will malfunction if the address is not provided.
+        service:
+          cloudhubNodePort: "30000"
+          cloudhubQuicNodePort: "30001"
+          cloudhubHttpsNodePort: "30002"
+          cloudstreamNodePort: "30003"
+          tunnelNodePort: "30004"
+        # resources: {}
+        # hostNetWork: false
+      iptables-manager:
+        enabled: true 
+        mode: "external"
+        # resources: {}
+      # edgeService:
+      #   resources: {}
+  gatekeeper:        # Provide admission policy and rule management, A validating (mutating TBA) webhook that enforces CRD-based policies executed by Open Policy Agent.
+    enabled: false   # Enable or disable Gatekeeper.
+    # controller_manager:
+    #   resources: {}
+    # audit:
+    #   resources: {}
+  terminal:
+    # image: 'alpine:3.15' # There must be an nsenter program in the image
+    timeout: 600         # Container timeout, if set to 0, no timeout will be used. The unit is seconds
 ```
 
 ### 配置
@@ -308,6 +480,16 @@ $ kubectl apply -f cluster-configuration.yaml
 ```bash
 $ kubectl logs -n kubesphere-system $(kubectl get pod -n kubesphere-system -l 'app in (ks-install, ks-installer)' -o jsonpath='{.items[0].metadata.name}') -f
 
+# 或者查看pod状态
+$ kubectl get po -n kubesphere-system 
+```
+
+
+
+## 问题
+
+```bash
+$ kubectl rollout restart deploy -n kubesphere-system ks-installer
 ```
 
 
