@@ -51,6 +51,39 @@ $ curl -L -O https://github.com/kubesphere/ks-installer/releases/download/v3.3.1
 # 查看需要的镜像，不需要的可以直接删掉
 ```
 
+## helm 安装
+
+安装helm版本策略：https://helm.sh/zh/docs/topics/version_skew/
+
+安装文档：https://helm.sh/zh/docs/intro/install/
+
+```bash
+$ wget https://get.helm.sh/helm-v3.8.2-linux-amd64.tar.gz
+$ tar -zxf helm-v3.8.2-linux-amd64.tar.gz 
+$ mv linux-amd64/helm /usr/bin
+
+#删除没用的安装文件
+$ rm -rf linux-amd64/ 
+$ rm -f helm-v3.8.2-linux-amd64.tar.gz
+
+#验证是否成功
+$ helm version
+
+# 添加阿里云的 chart 仓库
+$ helm repo add aliyun https://kubernetes.oss-cn-hangzhou.aliyuncs.com/charts
+
+#升级
+$ helm repo update
+
+#仓库列表
+$ helm repo list
+
+#从指定 chart 仓库地址搜索 chart
+$ helm search repo aliyun | grep redis
+```
+
+
+
 ## NFS搭建
 
 NFS即网络文件系统Network File System，它是一种[分布式文件系统](https://cloud.tencent.com/product/chdfs?from=10680)协议，最初是由Sun MicroSystems公司开发的类Unix操作系统之上的一款经典网络存储方案，其功能是在允许客户端主机可以像访问本地存储一样通过网络访问服务端文件。
@@ -121,6 +154,8 @@ opt/data/es 192.168.31.0/24
 ```
 
 ### kubernetes配置默认存储
+
+#### 通过yaml文件安装
 
 ```bash
 #创建以下yaml文件
@@ -255,6 +290,26 @@ roleRef:
 - Recycle
 
 - - 保留PV，但清空其上数据，已废弃
+
+#### 通过helm安装
+
+```bash
+$ helm repo add azure http://mirror.azure.cn/kubernetes/charts/
+$ helm search repo nfs-client-provisioner
+$ helm install nfs-kubesphere-storage azure/nfs-client-provisioner --set nfs.server=172.23.131.24 --set nfs.path=/opt/data/kubesphere/system --set storageClass.name=nfs-kubesphere-storage
+
+NAME: nfs-kubesphere-storage
+LAST DEPLOYED: Sun Dec 11 11:24:39 2022
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+#验证
+$ kubectl get sc
+```
+
+
 
 ## 部署
 

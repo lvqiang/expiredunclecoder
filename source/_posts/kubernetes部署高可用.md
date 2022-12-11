@@ -4,6 +4,7 @@ date: 2022-12-07 12:03:10
 tags:
 categories:
 - devops
+toc: true
 ---
 本文将从零开始，在干净的机器上安装 Docker、Kubernetes (使用 kubeadm)、Calico，搭建一个高可用生产级的 Kubernetes。
 
@@ -294,7 +295,7 @@ $ kube-vip manifest pod \
 ```bash
 $ kubeadm init \
  --apiserver-advertise-address 172.23.131.28 \
- --control-plane-endpoint 172.23.131.28:6443 \
+ --control-plane-endpoint 172.23.131.28 \
  --image-repository registry.cn-hangzhou.aliyuncs.com/google_containers \
  --kubernetes-version 1.23.9 \
  --pod-network-cidr=10.244.0.0/16 \
@@ -333,8 +334,8 @@ As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you c
 
 Then you can join any number of worker nodes by running the following on each as root:
 
-kubeadm join 172.23.131.28:6443 --token zi4l69.b9cf99ut3yihcc4w \
---discovery-token-ca-cert-hash sha256:ce3c955b27a1743b5a5a48c0a010d10c8553663d74f6ca3107702715bffb04e6 
+kubeadm join 172.23.131.28:6443 --token xn8doa.8myhmzr9oab5ues6 \
+--discovery-token-ca-cert-hash sha256:a0fbeadfa30cc11837d74323f8293844adf1129139b0cb51991aa375035d76ef 
 ```
 
 根据上面的提示执行命令
