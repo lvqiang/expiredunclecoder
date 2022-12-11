@@ -1,6 +1,17 @@
+---
+title: kubesphere搭建
+date: 2022-12-07 12:03:10
+tags: kubesphere
+categories:
+- devops
+
+---
+
 [KubeSphere](https://kubesphere.io/) 是在 [Kubernetes](https://kubernetes.io/) 之上构建的面向云原生应用的**分布式操作系统**，完全开源，支持多云与多集群管理，提供全栈的 IT 自动化运维能力，简化企业的 DevOps 工作流。它的架构可以非常方便地使第三方应用与云原生生态组件进行即插即用 (plug-and-play) 的集成。
 
 参考文档：https://kubesphere.com.cn/docs/v3.3/installing-on-kubernetes/on-prem-kubernetes/install-ks-on-linux-airgapped/
+
+提示：本文是在原有kubernetes基础上搭建kubesphere，难度较大，我尝试装了好多次，虽然以前有成功的经验，但是这次还是失败了好多次，总结经验首先要有k8s的基础，在安装部署过程中会有多个pod失败，需要多次尝试修改才可以；第二要在一个完成干净的机器上安装好k8s；第三一定要保证机器的容量。如果还是一直失败，推荐先用其kk工具搭建一个完整的kubesphere，等待熟悉各个组件之后，再次尝试在原有k8s基础上安装。
 
 ## 私有harbor
 
@@ -39,10 +50,6 @@ $ curl -L -O https://github.com/kubesphere/ks-installer/releases/download/v3.3.1
 
 # 查看需要的镜像，不需要的可以直接删掉
 ```
-
-
-
-
 
 ## NFS搭建
 
@@ -114,13 +121,6 @@ opt/data/es 192.168.31.0/24
 ```
 
 ### kubernetes配置默认存储
-
-```bash
-# 创建一个新的namespace
-$ kubectl create ns kubesphere-system
-```
-
-
 
 ```bash
 #创建以下yaml文件
@@ -280,7 +280,7 @@ spec:
   authentication:
     # adminPassword: "" 
     jwtSecret: ""          
-  local_registry: ""        # Add your private registry address if it is needed.
+  local_registry: "172.23.131.24:8222"        # Add your private registry address if it is needed.
   # dev_tag: ""             
   etcd:
     monitoring: false       
@@ -334,11 +334,11 @@ spec:
       externalElasticsearchHost: ""
       externalElasticsearchPort: ""
   alerting:               
-    enabled: true        
+    enabled: false      
     # thanosruler:
     #   replicas: 1
     #   resources: {}
-  auditing:                # Provide a security-relevant chronological set of records，recording the sequence of activities happening on the platform, initiated by different tenants.
+  auditing:                
     enabled: false         # Enable or disable the KubeSphere Auditing Log System.
     # operator:
     #   resources: {}
@@ -486,7 +486,20 @@ $ kubectl get po -n kubesphere-system
 
 
 
+## 界面
+
+
+
 ## 问题
+
+如果使用了不是干净的机器安装，或多或少会遇到网络问题，所以在安装kubesphere之前一定要重置机器。
+
+如果在安装后发现pod一直CrashLoopBackOff，一定要通过命令log或者describe是看原因，我安装下来基本上是两种
+
+1. 资源不够
+2. 存储设置不对
+
+在解决以上问题后，首先要delete掉问题pod，如果还是有问题，建议重启installer。
 
 ```bash
 $ kubectl rollout restart deploy -n kubesphere-system ks-installer

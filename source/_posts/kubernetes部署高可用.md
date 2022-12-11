@@ -105,6 +105,8 @@ $ sed -ri 's/.*swap.*/#&/' /etc/fstab
 ### 配置宿主机网卡转发
 
 ```bash
+$ modprobe br_netfilter
+
 $ cat <<EOF >  /etc/sysctl.d/docker.conf
 net.bridge.bridge-nf-call-iptables = 1
 net.bridge.bridge-nf-call-ip6tables = 1
@@ -292,7 +294,7 @@ $ kube-vip manifest pod \
 ```bash
 $ kubeadm init \
  --apiserver-advertise-address 172.23.131.28 \
- --control-plane-endpoint 172.23.131.100:6443 \
+ --control-plane-endpoint 172.23.131.28:6443 \
  --image-repository registry.cn-hangzhou.aliyuncs.com/google_containers \
  --kubernetes-version 1.23.9 \
  --pod-network-cidr=10.244.0.0/16 \
@@ -321,9 +323,9 @@ Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 
 You can now join any number of the control-plane node running the following command on each as root:
 
-   kubeadm join 172.23.131.100:6443 --token 9vi77p.nkla7mjdekzwngbx \
-	--discovery-token-ca-cert-hash sha256:c13e578e5d18f098c74b0777bbd43f46566dea9a72950a77534ff757653bd05e \
-	--control-plane --certificate-key 8d95f8ef5c7e95602c796f1f5c18cfea44ca45d356ad7d988544f34d52509bb4
+  kubeadm join 172.23.131.28:6443 --token zi4l69.b9cf99ut3yihcc4w \
+	--discovery-token-ca-cert-hash sha256:ce3c955b27a1743b5a5a48c0a010d10c8553663d74f6ca3107702715bffb04e6 \
+	--control-plane --certificate-key 16edd3ee4550b63d1719b4a55ffdd3e31f74e1687e1982387adecefc1b131b3f
 
 Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
 As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
@@ -331,8 +333,8 @@ As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you c
 
 Then you can join any number of worker nodes by running the following on each as root:
 
-kubeadm join 172.23.131.100:6443 --token 9vi77p.nkla7mjdekzwngbx \
-	--discovery-token-ca-cert-hash sha256:c13e578e5d18f098c74b0777bbd43f46566dea9a72950a77534ff757653bd05e 
+kubeadm join 172.23.131.28:6443 --token zi4l69.b9cf99ut3yihcc4w \
+--discovery-token-ca-cert-hash sha256:ce3c955b27a1743b5a5a48c0a010d10c8553663d74f6ca3107702715bffb04e6 
 ```
 
 根据上面的提示执行命令
@@ -367,7 +369,7 @@ $ kubectl get pods --all-namespaces
 $ ipvsadm -L -n
 ```
 
-### master2、3节点
+### master2节点
 
 #### 高可用
 
@@ -477,6 +479,9 @@ tigera-operator    tigera-operator-7885599d97-vdf6z             1/1     Running 
 $ kubeadm join 172.23.131.100:6443 --token 9vi77p.nkla7mjdekzwngbx \
 --discovery-token-ca-cert-hash sha256:c13e578e5d18f098c74b0777bbd43f46566dea9a72950a77534ff757653bd05e 
 
+kubeadm join 172.23.131.28:6443 --token ks62mn.ixb479nvk4yyuw1n \
+--discovery-token-ca-cert-hash sha256:02f1b6fb7962f9b841017c21b846635e738504ed57a895f321e02de1a0dee8f9 
+
 #验证是否成功
 $ kubectl get nodes
 ```
@@ -510,9 +515,13 @@ $ docker rm $(docker ps -a -q)
 
 #重置ipvs
 $ ipvsadm --clear
+#iptables重置
+$ iptables -F
 
 #删除原有集群文件
-$ rm -rf /etc/cni /opt/cni  /etc/kubernetes /var/lib/dockershim /var/lib/etcd /var/lib/kubelet /var/lib/cni /var/run/kubernetes /var/run/calico ~/.kube/*
+$ rm -rf /etc/cni /opt/cni /var/lib/cni 
+$ rm -rf /var/etcd /var/lib/etcd
+$ rm -rf /etc/kubernetes /var/lib/dockershim /var/lib/kubelet /var/run/kubernetes /var/run/calico ~/.kube/*
 
 #重启docker
 $ systemctl restart docker
