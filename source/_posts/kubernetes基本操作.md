@@ -7,6 +7,12 @@ categories: devops
 
 ## 集群相关
 
+加入master节点，生成新的token。
+
+```bash
+$ kubeadm token create --print-join-command
+```
+
 
 
 ## pod相关

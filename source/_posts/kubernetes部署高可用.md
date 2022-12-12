@@ -333,8 +333,8 @@ As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you c
 
 Then you can join any number of worker nodes by running the following on each as root:
 
-kubeadm join 172.23.131.28:6443 --token xn8doa.8myhmzr9oab5ues6 \
---discovery-token-ca-cert-hash sha256:a0fbeadfa30cc11837d74323f8293844adf1129139b0cb51991aa375035d76ef 
+kubeadm join 172.23.131.28:6443 --token xz2514.zc6ekgn1npfm9kgv \
+--discovery-token-ca-cert-hash sha256:47888db99278ed38f8792e5d245afb320f80b54eb28e911b0d6f33802d0f687e 
 ```
 
 根据上面的提示执行命令
@@ -431,10 +431,10 @@ Calico最重要的是要选对版本号：https://projectcalico.docs.tigera.io/g
 安装参考：https://projectcalico.docs.tigera.io/archive/v3.23/getting-started/kubernetes/quickstart
 
 ```bash
-$ kubectl create -f https://projectcalico.docs.tigera.io/archive/v3.23/manifests/tigera-operator.yaml
+$ kubectl create -f https://projectcalico.docs.tigera.io/archive/v3.21.6/manifests/tigera-operator.yaml
 
 # 修改pod地址
-$ wget https://projectcalico.docs.tigera.io/archive/v3.23/manifests/custom-resources.yaml
+$ wget https://projectcalico.docs.tigera.io/archive/v3.21.6/manifests/custom-resources.yaml
 $ vim custom-resources.yaml
 cidr: 10.244.0.0/16
 
@@ -444,6 +444,16 @@ $ kubectl apply -f custom-resources.yaml
 #查看安装进度
 $ watch kubectl get pods -n calico-system
 ```
+
+#### helm安装
+
+```bash
+$ wget https://github.com/projectcalico/calico/releases/download/v3.21.6/tigera-operator-v3.21.6.tgz
+$ helm install calico tigera-operator-v3.21.6.tgz 
+$ kubectl -n calico-system get pod
+```
+
+
 
 ### 验证
 
@@ -519,11 +529,47 @@ $ ipvsadm --clear
 $ iptables -F
 
 #删除原有集群文件
-$ rm -rf /etc/cni /opt/cni /var/lib/cni 
+$ rm -rf /etc/cni /opt/cni /var/lib/cni /etc/cni/net.d/*
 $ rm -rf /var/etcd /var/lib/etcd
 $ rm -rf /etc/kubernetes /var/lib/dockershim /var/lib/kubelet /var/run/kubernetes /var/run/calico ~/.kube/*
 
+#删除calico网络
+$ ifconfig vxlan.calico down
+$ ip link delete vxlan.calico
+
+#重启kubelet
+$ systemctl restart kubelet
 #重启docker
 $ systemctl restart docker
+```
+
+## Kuboard安装
+
+### 安装
+
+```bash
+docker run -d \
+  --restart=unless-stopped \
+  --name=kuboard \
+  -p 80:80/tcp \
+  -p 10081:10081/tcp \
+  -e KUBOARD_ENDPOINT="http://172.23.131.28:80" \
+  -e KUBOARD_AGENT_SERVER_TCP_PORT="10081" \
+  -v /opt/kubesphere/kuboard/data:/data \
+  swr.cn-east-2.myhuaweicloud.com/kuboard/kuboard:v3
+```
+
+### 访问
+
+在浏览器输入 http://172.23.131.28:80 即可访问 Kuboard v3.x 的界面，登录方式：
+
+用户名： admin
+密 码： Kuboard123
+
+```bash
+在浏览器输入 http://your-host-ip:80 即可访问 Kuboard v3.x 的界面，登录方式：
+
+用户名： admin
+密 码： Kuboard123
 ```
 
