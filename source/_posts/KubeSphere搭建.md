@@ -296,7 +296,7 @@ roleRef:
 ```bash
 $ helm repo add azure http://mirror.azure.cn/kubernetes/charts/
 $ helm search repo nfs-client-provisioner
-$ helm install nfs-kubesphere-storage azure/nfs-client-provisioner --set nfs.server=172.23.131.24 --set nfs.path=/opt/data/kubesphere/system --set storageClass.name=nfs-kubesphere-storage
+$ helm install nfs-kubesphere-storage azure/nfs-client-provisioner --set nfs.server=172.23.131.24 --set nfs.path=/opt/data/kubesphere/system --set storageClass.name=nfs-kubesphere-storage --set storageClass.defaultClass=true
 
 NAME: nfs-kubesphere-storage
 LAST DEPLOYED: Sun Dec 11 11:24:39 2022
@@ -559,6 +559,40 @@ $ kubectl get po -n kubesphere-system
 ```bash
 $ kubectl rollout restart deploy -n kubesphere-system ks-installer
 ```
+
+### apiservice
+
+安装installer时发现一直crash，看日志出现以下内容：
+
+```bash
+error getting GVR for kind 'ClusterConfiguration': unable to retrieve the complete list of server APIs: projectcalico.org/v3: the server is currently unable to handle the request
+
+$ kubectl get apiservice
+------------------------------------
+v1beta2.flowcontrol.apiserver.k8s.io   Local                         True                           22h
+v2.autoscaling                         Local                         True                           22h
+v2beta1.autoscaling                    Local                         True                           22h
+v2beta2.autoscaling                    Local                         True                           22h
+v3.projectcalico.org                   calico-apiserver/calico-api   False (FailedDiscoveryCheck)   22h
+
+#可以看到 False (FailedDiscoveryCheck) 的列表，删除该apiservice即可
+$ kubectl delete apiservice v3.projectcalico.org
+```
+
+### default storageClass
+
+安装过程中，如果出现以下内容，表示k8s里没有默认的动态存储，创建即可。
+
+```bash
+fatal: [localhost]: FAILED! => {
+    "assertion": "\"(default)\" in default_storage_class_check.stdout",
+    "changed": false,
+    "evaluated_to": false,
+    "msg": "Default StorageClass was not found !"
+}
+```
+
+
 
 
 
