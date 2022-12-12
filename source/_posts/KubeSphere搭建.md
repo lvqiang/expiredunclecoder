@@ -592,6 +592,21 @@ fatal: [localhost]: FAILED! => {
 }
 ```
 
+###  SelfLink
+
+如果出现默认绑定pvc一直处于Pending，需要查看nfs pod的日志如果出现selfLink was empty, can't make reference的内容，可知因为selfLink在1.16版本以后已经弃用，在1.20版本停用。
+
+```bash
+#修改/etc/kubernetes/manifests/kube-apiserver.yaml文件
+$ vim /etc/kubernetes/manifests/kube-apiserver.yaml
+---------------------------------------
+ - --feature-gates=RemoveSelfLink=false
+ 
+ # 添加后需要删除apiserver的所有pod进行重启
+```
+
+
+
 
 
 
