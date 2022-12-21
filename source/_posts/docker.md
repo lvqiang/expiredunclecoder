@@ -5,7 +5,7 @@ tags:
 categoriesa: devops
 ---
 
-## 操作
+
 
 <img src="http://cdn.expiredunclecoder.tech/image-20221201114525791.png" alt="image-20221201114525791" style="zoom:50%;" />
 
@@ -79,6 +79,13 @@ REPOSITORY               TAG                 IMAGE ID            CREATED        
 nginx                    alpine              333c0837328f        1 weeks ago         
 localhost:5000/nginx     alpine              333c0837328f        2 weeks ago         
 registry                 2                   708bc6af7e5e        1 months ago     
+```
+
+#### 登录
+
+```bash
+$ docker login HOST -u USER -p PASS
+$ docker logout
 ```
 
 ### 容器相关
@@ -163,3 +170,4 @@ $ docker inspect nginx
 ## 查看镜像的明细信息
 $ docker inspect nginx:alpine
 ```
+
