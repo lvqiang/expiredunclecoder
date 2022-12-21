@@ -100,7 +100,7 @@ ignore:
 ## Themes: https://hexo.io/themes/
 theme: snark
 theme_config:
-  description: "过了期的码农叔叔宅基地，多好算好！"
+  description: "过期的码农叔叔基地，多好算好！"
   theme_color: "#C7C7C7"
   copyright: false
   valine: ## https://valine.js.org
