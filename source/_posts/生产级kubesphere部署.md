@@ -400,7 +400,68 @@ nfs.disable: on
 performance.client-io-threads: off
 ```
 
+## 组件
 
+KubeSphere 解耦了一些核心功能组件。这些组件设计成了可插拔式，前面我们按照最小化来安装部署，下面尝试使用一些组件来完善功能。
+
+文档：https://kubesphere.io/zh/docs/v3.3/pluggable-components/overview/
+
+### 监控
+
+kubesphere默认是使用了prometheus-operator，具体使用文档可以参考https://www.prometheus.wang/operator/what-is-prometheus-operator.html。其中kubesphere已经帮我们来完成了集群中容器监控和展示。如果自定义我们其他的监控，可以通过创建servicemonitor来完成。
+
+具体kubesphere自定义监控文档可以参考：https://kubesphere.io/zh/docs/v3.3/project-user-guide/custom-application-monitoring/introduction/
+
+<img src="http://cdn.expiredunclecoder.tech/image-20221227135048311.png" alt="image-20221227135048311" style="zoom: 50%;" />
+
+#### mysql监控
+
+使用mysql exporter创建servicemonitor来获取mysql的监控数据给到prometheus。具体安装如下：
+
+1. 从dockerhub中找到mysql exporter镜像。https://hub.docker.com/r/prom/mysqld-exporter。
+
+2. 通过kubesphere来创建deployment。
+
+   <img src="http://cdn.expiredunclecoder.tech/image-20221227141247915.png" alt="image-20221227141247915" style="zoom:50%;" />
+
+3. 创建成功后。
+
+   <img src="http://cdn.expiredunclecoder.tech/image-20221227142041775.png" style="zoom: 50%;" />
+
+4. 创建service来提供给servicemonitor
+
+   <img src="http://cdn.expiredunclecoder.tech/image-20221227142600190.png" alt="image-20221227142600190" style="zoom:67%;" />
+
+5. 创建相应servicemonitor,prom-mysql-exporter-sm.yaml
+
+   ```yaml
+   apiVersion: monitoring.coreos.com/v1
+   kind: ServiceMonitor 
+   metadata:
+     labels:
+       app: prom-mysql-exporter-sm
+     name: prom-mysql-exporter-sm
+     namespace: kubesphere-monitoring-system
+   spec:
+     selector:
+       matchLabels:
+         app: prom-mysql-exporter-svc   # 该serviceMonitor 通过标签选择器 来自动发现exporter 的sevice
+     namespaceSelector:
+       matchNames:
+       - kubesphere-monitoring-system
+     endpoints:
+     - port: 9104    
+       interval: 30s 
+       honorLabels: tru
+   ```
+
+6. 在自定义监控面板中创建mysql监控面板即可。
+
+   <img src="http://cdn.expiredunclecoder.tech/image-20221227144340576.png" alt="image-20221227144340576" style="zoom:33%;" />
+
+#### redis监控
+
+同上。
 
 ## 问题
 
