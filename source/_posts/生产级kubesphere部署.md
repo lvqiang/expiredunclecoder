@@ -463,6 +463,43 @@ kubesphere默认是使用了prometheus-operator，具体使用文档可以参考
 
 同上。
 
+### 日志系统
+
+KubeSphere 为日志收集、查询和管理提供了一个强大的、全面的、易于使用的日志系统。文档：https://kubesphere.io/zh/docs/v3.3/pluggable-components/logging/
+
+#### 开启日志组件
+
+```yaml
+#根据文档修改log配置
+logging:
+  enabled: true # 将“false”更改为“true”。
+  containerruntime: docker
+```
+
+#### es安装
+
+kubesphere虽然提供的内部了es组件，不过还是推荐使用外部es中间件，可以使用kubesphere自己部署es来完成日志收集与保存。
+
+##### 创建日志sc
+
+通过kubesphere中的存储功能创建glusterfs-sc-es-log。
+
+<img src="http://cdn.expiredunclecoder.tech/image-20221227151852854.png" alt="image-20221227151852854" style="zoom:50%;" />
+
+##### 部署es
+
+首先创建项目elasticsearch-cluster，创建有状态副本集es。不在详细演示。
+
+<img src="http://cdn.expiredunclecoder.tech/image-20221227161426675.png" alt="image-20221227161426675" style="zoom:50%;" />
+
+##### 配置外部es
+
+<img src="http://cdn.expiredunclecoder.tech/image-20221227161500775.png" alt="image-20221227161500775" style="zoom:50%;" />
+
+##### 查询
+
+<img src="http://cdn.expiredunclecoder.tech/image-20221227161530804.png" alt="image-20221227161530804" style="zoom:50%;" />
+
 ## 问题
 
 如果使用了不是干净的机器安装，或多或少会遇到网络问题，所以在安装kubesphere之前一定要重置机器。
